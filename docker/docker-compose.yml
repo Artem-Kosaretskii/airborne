@@ -1,0 +1,98 @@
+version: '3.8'
+services:
+  nginx:
+    container_name: "${PROJECT_PREFIX}-nginx"
+    hostname: "${PROJECT_PREFIX}-nginx"
+    build: ./volumes/build/nginx
+    env_file: .env
+    volumes:
+      - /var/log/nginx:/var/log/nginx
+      - ./volumes/etc/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./volumes/etc/nginx/sites-enabled:/etc/nginx/sites-enabled:ro
+      - ./volumes/etc/nginx/ssl:/etc/nginx/ssl:ro
+      - /etc/letsencrypt/:/etc/letsencrypt/
+      - ./../www:/var/www
+    ports:
+      - "80:80"
+      - "443:443"
+    links:
+      - php-fpm8.1
+    restart: always
+    networks:
+      default:
+        ipv4_address: 172.16.1.4
+
+  php-fpm8.1:
+    container_name: "${PROJECT_PREFIX}-php-fpm"
+    hostname: "${PROJECT_PREFIX}t-php-fpm"
+    build: ./volumes/build/php-fpm8.1
+    env_file: .env
+    ports:
+      - "9000:9010"
+    volumes:
+      - /etc/letsencrypt/live/myhostfordev.top:/etc/letsencrypt/live/myhostfordev.top/
+      - ./volumes/etc/php-fpm8.1/fpm.pool.d/domain.conf:/usr/local/etc/php-fpm.d/domain.conf
+      - ./volumes/etc/php-fpm8.1/php.ini:/usr/local/etc/php/conf.d/php.ini
+      - ./volumes/etc/php-fpm8.1/xdebug.ini:/usr/local/etc/php/conf.d/docker-php-ext-xdebug.ini
+      - ./volumes/etc/php-fpm8.1/error_reporting.ini:/usr/local/etc/php/conf.d/error_reporting.ini
+      - ./volumes/log/php:/var/log/php
+      - ./volumes/sess:/var/tmp/sess
+      - ./volumes/upload:/var/tmp/upload
+      - ./../www:/var/www
+      - /etc/group:/etc/group:ro
+      - /etc/passwd:/etc/passwd:ro
+      - /etc/shadow:/etc/shadow:ro
+    cap_add:
+      - SYS_NICE
+      - DAC_READ_SEARCH
+      - SYS_PTRACE
+    restart: always
+    networks:
+      default:
+        ipv4_address: 172.16.1.5
+
+  mysql:
+    env_file: .env
+    container_name: "${PROJECT_PREFIX}-mysql"
+    hostname: "${PROJECT_PREFIX}-mysql"
+    build: ./volumes/build/mysql
+    ports:
+      - "3306:3310"
+    environment:
+      MYSQL_ALLOW_EMPTY_PASSWORD: 1
+    volumes:
+      - /var/lib/mysql:/var/lib/mysql
+      - /var/log/mysql:/var/log/mysql
+      - ./volumes/etc/mysql/conf.d:/etc/mysql/conf.d:ro
+    networks:
+      default:
+        ipv4_address: 172.16.1.6
+    restart: always
+
+  postgresql:
+    env_file: .env
+    container_name: "${PROJECT_PREFIX}-postgresql"
+    hostname: "${PROJECT_PREFIX}-postgresql"
+    build: ./volumes/build/postgresql
+    environment:
+      POSTGRES_DB: "${POSTGRES_DB}"
+      POSTGRES_USER: "${POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${POSTGRES_PASSWORD}"
+    ports:
+      - "5432:5432"
+    volumes:
+      - /var/lib/postgresql:/var/lib/postgresql:rw
+      - /var/log/postgresql:/var/log/postgresql
+      - ./volumes/etc/postgresql/postgresql.conf:/etc/postgresql/postgresql.conf
+      - ./volumes/etc/postgresql/pg_hba.conf:/etc/postgresql/pg_hba.conf
+    networks:
+      default:
+        ipv4_address: 172.16.1.7
+    restart: always
+
+networks:
+  default:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.16.1.0/24
